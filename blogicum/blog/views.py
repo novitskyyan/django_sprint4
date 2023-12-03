@@ -23,17 +23,29 @@ class ProfileView(DetailView):
     def get_object(self, queryset=None):
         return get_object_or_404(User, username=self.kwargs['username'])
 
+    def posts_with_annotation(self, posts):
+        return posts.annotate(comment_count=Count('comment'))
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         author = self.get_object()
         if self.request.user == author:
-            posts = Post.objects.filter(author=author).order_by(
-                '-pub_date').annotate(comment_count=Count('comment'))
+            posts = self.posts_with_annotation(
+                Post.objects.filter(
+                    author=author
+                ).order_by(
+                    '-pub_date'
+                )
+            )
         else:
-            posts = Post.objects.filter(author=author,
-                                        is_published=True).order_by(
-                '-pub_date').annotate(comment_count=Count('comment'))
-        paginator = Paginator(posts, 10)
+            posts = self.posts_with_annotation(
+                Post.published_objects.filter(
+                    author=author
+                ).order_by(
+                    '-pub_date'
+                )
+            )
+        paginator = Paginator(posts, COMMON_PAGINATION)
         page_number = self.request.GET.get('page', 1)
         page_obj = paginator.get_page(page_number)
         context['page_obj'] = page_obj
